@@ -1,16 +1,15 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navbar } from "@/components/navbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { mockForumPosts } from "@/lib/mock-data";
 import { useAuth } from "@/lib/auth-context";
+import { fetchForumPosts, createForumPost, likeForumPost } from "@/lib/api";
 import {
-  MessageSquare, Heart, Search, Plus, ThumbsUp, Tag,
-  TrendingUp, Users, BookOpen, Eye
+  MessageSquare, Heart, Search, Plus, Tag, TrendingUp, Users
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -38,44 +37,61 @@ export default function ForumPage() {
   const [category, setCategory] = useState("All");
   const [showNewPost, setShowNewPost] = useState(false);
   const [newPost, setNewPost] = useState({ title: "", body: "", category: "Discussion" });
-  const [liked, setLiked] = useState<Set<string>>(new Set());
-  const [posts, setPosts] = useState(mockForumPosts);
+  const [liked, setLiked] = useState<Set<number>>(new Set());
+  const [posts, setPosts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchForumPosts()
+      .then(data => {
+        setPosts(Array.isArray(data) ? data : []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
 
   const filtered = posts.filter(p => {
-    const matchSearch = p.title.toLowerCase().includes(search.toLowerCase()) || p.body.toLowerCase().includes(search.toLowerCase());
+    const matchSearch =
+      p.title?.toLowerCase().includes(search.toLowerCase()) ||
+      p.content?.toLowerCase().includes(search.toLowerCase());
     const matchCat = category === "All" || p.category === category;
     return matchSearch && matchCat;
   });
 
-  const toggleLike = (id: string) => {
-    const newLiked = new Set(liked);
-    if (newLiked.has(id)) {
-      newLiked.delete(id);
-      setPosts(prev => prev.map(p => p.id === id ? { ...p, likes: p.likes - 1 } : p));
-    } else {
-      newLiked.add(id);
-      setPosts(prev => prev.map(p => p.id === id ? { ...p, likes: p.likes + 1 } : p));
+  const toggleLike = async (id: number) => {
+    try {
+      await likeForumPost(id);
+      const newLiked = new Set(liked);
+      if (newLiked.has(id)) {
+        newLiked.delete(id);
+        setPosts(prev => prev.map(p => p.id === id ? { ...p, likes: p.likes - 1 } : p));
+      } else {
+        newLiked.add(id);
+        setPosts(prev => prev.map(p => p.id === id ? { ...p, likes: p.likes + 1 } : p));
+      }
+      setLiked(newLiked);
+    } catch {
+      toast.error("Failed to like post");
     }
-    setLiked(newLiked);
   };
 
-  const submitPost = () => {
+  const submitPost = async () => {
     if (!newPost.title || !newPost.body) { toast.error("Fill all fields"); return; }
-    const post = {
-      id: `f${Date.now()}`,
-      author: user?.name || "Anonymous",
-      role: user?.role || "citizen",
-      title: newPost.title,
-      body: newPost.body,
-      replies: 0,
-      likes: 0,
-      timestamp: new Date().toISOString().split("T")[0],
-      category: newPost.category,
-    };
-    setPosts(prev => [post, ...prev]);
-    setNewPost({ title: "", body: "", category: "Discussion" });
-    setShowNewPost(false);
-    toast.success("Post created!");
+    try {
+      const post = await createForumPost({
+        title: newPost.title,
+        content: newPost.body,
+        author: user?.name || "Anonymous",
+        likes: 0,
+        replies: 0,
+      });
+      setPosts(prev => [post, ...prev]);
+      setNewPost({ title: "", body: "", category: "Discussion" });
+      setShowNewPost(false);
+      toast.success("Post created!");
+    } catch {
+      toast.error("Failed to create post");
+    }
   };
 
   return (
@@ -87,7 +103,9 @@ export default function ForumPage() {
             <h1 className="text-3xl font-bold flex items-center gap-2">
               <MessageSquare className="w-7 h-7 text-primary" /> Community Forum
             </h1>
-            <p className="text-muted-foreground mt-1">Discuss elections, share insights, ask questions, and inspire fellow citizens.</p>
+            <p className="text-muted-foreground mt-1">
+              Discuss elections, share insights, ask questions, and inspire fellow citizens.
+            </p>
           </div>
           {user && (
             <Button onClick={() => setShowNewPost(!showNewPost)}>
@@ -103,13 +121,26 @@ export default function ForumPage() {
               <CardTitle className="text-base">Create New Post</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Input placeholder="Post title..." value={newPost.title} onChange={e => setNewPost({...newPost, title: e.target.value})} />
-              <Textarea placeholder="Share your thoughts, questions, or insights..." value={newPost.body}
-                onChange={e => setNewPost({...newPost, body: e.target.value})} rows={4} />
+              <Input
+                placeholder="Post title..."
+                value={newPost.title}
+                onChange={e => setNewPost({ ...newPost, title: e.target.value })}
+              />
+              <Textarea
+                placeholder="Share your thoughts, questions, or insights..."
+                value={newPost.body}
+                onChange={e => setNewPost({ ...newPost, body: e.target.value })}
+                rows={4}
+              />
               <div className="flex items-center gap-3">
-                <select className="flex h-9 w-40 rounded-md border border-input bg-background px-3 py-1 text-sm"
-                  value={newPost.category} onChange={e => setNewPost({...newPost, category: e.target.value})}>
-                  {CATEGORIES.filter(c => c !== "All").map(c => <option key={c} value={c}>{c}</option>)}
+                <select
+                  className="flex h-9 w-40 rounded-md border border-input bg-background px-3 py-1 text-sm"
+                  value={newPost.category}
+                  onChange={e => setNewPost({ ...newPost, category: e.target.value })}
+                >
+                  {CATEGORIES.filter(c => c !== "All").map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
                 </select>
                 <Button onClick={submitPost}>Publish Post</Button>
                 <Button variant="ghost" onClick={() => setShowNewPost(false)}>Cancel</Button>
@@ -121,50 +152,70 @@ export default function ForumPage() {
         <div className="grid lg:grid-cols-4 gap-8">
           {/* Main content */}
           <div className="lg:col-span-3 space-y-4">
-            {/* Search + Filter */}
+            {/* Search */}
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input className="pl-10" placeholder="Search discussions..." value={search} onChange={e => setSearch(e.target.value)} />
+                <Input
+                  className="pl-10"
+                  placeholder="Search discussions..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                />
               </div>
             </div>
 
             {/* Category Filters */}
             <div className="flex flex-wrap gap-2">
               {CATEGORIES.map(c => (
-                <Button key={c} size="sm" variant={category === c ? "default" : "outline"} onClick={() => setCategory(c)}>
+                <Button
+                  key={c} size="sm"
+                  variant={category === c ? "default" : "outline"}
+                  onClick={() => setCategory(c)}
+                >
                   {c}
                 </Button>
               ))}
             </div>
 
+            {/* Loading */}
+            {loading && (
+              <div className="text-center py-12 text-muted-foreground">
+                <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-30 animate-pulse" />
+                <p>Loading posts...</p>
+              </div>
+            )}
+
             {/* Posts */}
-            {filtered.map((post) => (
+            {!loading && filtered.map((post) => (
               <Card key={post.id} className="border border-border/50 hover:shadow-md transition-all cursor-pointer group">
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 flex-1">
                       <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold flex-shrink-0">
-                        {post.author.charAt(0)}
+                        {post.author?.charAt(0) || "U"}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className="text-sm font-semibold">{post.author}</span>
                           <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${roleColors[post.role] || roleColors.citizen}`}>
-                            {post.role}
+                            {post.role || "citizen"}
                           </span>
-                          <span className="text-xs text-muted-foreground">· {post.timestamp}</span>
+                          <span className="text-xs text-muted-foreground">
+                            · {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : ""}
+                          </span>
                         </div>
                         <h3 className="font-semibold text-base group-hover:text-primary transition-colors mb-1">
                           {post.title}
                         </h3>
-                        <p className="text-sm text-muted-foreground line-clamp-2">{post.body}</p>
+                        <p className="text-sm text-muted-foreground line-clamp-2">
+                          {post.content}
+                        </p>
                         <div className="flex items-center gap-4 mt-3">
                           <button
                             onClick={() => toggleLike(post.id)}
-                            className={`flex items-center gap-1.5 text-sm transition-colors ${
-                              liked.has(post.id) ? "text-red-500" : "text-muted-foreground hover:text-red-500"
-                            }`}
+                            className={`flex items-center gap-1.5 text-sm transition-colors ${liked.has(post.id) ? "text-red-500" : "text-muted-foreground hover:text-red-500"
+                              }`}
                           >
                             <Heart className={`w-4 h-4 ${liked.has(post.id) ? "fill-current" : ""}`} />
                             {post.likes}
@@ -176,15 +227,17 @@ export default function ForumPage() {
                         </div>
                       </div>
                     </div>
-                    <Badge className={categoryColors[post.category] || "bg-muted text-muted-foreground"}>
-                      {post.category}
-                    </Badge>
+                    {post.category && (
+                      <Badge className={categoryColors[post.category] || "bg-muted text-muted-foreground"}>
+                        {post.category}
+                      </Badge>
+                    )}
                   </div>
                 </CardContent>
               </Card>
             ))}
 
-            {filtered.length === 0 && (
+            {!loading && filtered.length === 0 && (
               <div className="text-center py-12 text-muted-foreground">
                 <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-30" />
                 <p>No posts found. Be the first to start a discussion!</p>
@@ -194,12 +247,11 @@ export default function ForumPage() {
 
           {/* Sidebar */}
           <div className="space-y-5">
-            {/* Stats */}
             <Card className="border border-border/50">
               <CardHeader><CardTitle className="text-sm">Forum Stats</CardTitle></CardHeader>
               <CardContent className="space-y-3">
                 {[
-                  { label: "Total Discussions", value: "284", icon: MessageSquare },
+                  { label: "Total Discussions", value: posts.length.toString(), icon: MessageSquare },
                   { label: "Community Members", value: "1,842", icon: Users },
                   { label: "Topics This Week", value: "47", icon: TrendingUp },
                 ].map((s) => (
@@ -214,7 +266,6 @@ export default function ForumPage() {
               </CardContent>
             </Card>
 
-            {/* Trending Topics */}
             <Card className="border border-border/50">
               <CardHeader><CardTitle className="text-sm">Trending Topics</CardTitle></CardHeader>
               <CardContent className="space-y-2">
@@ -227,7 +278,6 @@ export default function ForumPage() {
               </CardContent>
             </Card>
 
-            {/* Guidelines */}
             <Card className="border border-border/50">
               <CardHeader><CardTitle className="text-sm">Community Guidelines</CardTitle></CardHeader>
               <CardContent className="space-y-2 text-xs text-muted-foreground">

@@ -17,7 +17,6 @@ export default function RegisterPage() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (step === 1) {
@@ -26,15 +25,32 @@ export default function RegisterPage() {
         return;
       }
       setIsLoading(true);
-      await new Promise(r => setTimeout(r, 1000));
-      setIsLoading(false);
-      setStep(2);
-      toast.success("OTP sent to your email!");
-    } else {
-      setIsLoading(true);
-      await new Promise(r => setTimeout(r, 1000));
-      setIsLoading(false);
-      setStep(3);
+      try {
+        const res = await fetch("http://localhost:8080/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: formData.name,
+            email: formData.email,
+            password: formData.password
+          })
+        });
+        const data = await res.text();
+        if (data === "Registered successfully") {
+          setIsLoading(false);
+          setStep(3);
+          toast.success("Registration successful!");
+        } else if (data === "Email already exists") {
+          toast.error("Email already registered!");
+          setIsLoading(false);
+        } else {
+          toast.error("Registration failed");
+          setIsLoading(false);
+        }
+      } catch {
+        toast.error("Cannot connect to server");
+        setIsLoading(false);
+      }
     }
   };
 
@@ -51,7 +67,7 @@ export default function RegisterPage() {
             <div className="text-blue-300 text-sm">Election Monitoring System</div>
           </div>
         </div>
-        <h1 className="text-4xl font-bold mb-4">Join the movement<br/><span className="text-green-400">for fair elections.</span></h1>
+        <h1 className="text-4xl font-bold mb-4">Join the movement<br /><span className="text-green-400">for fair elections.</span></h1>
         <p className="text-blue-200 text-lg mb-8">Register as a citizen, observer, or analyst and play your part in democratic transparency.</p>
         <div className="space-y-3">
           {["Monitor elections in real-time", "Report suspicious activities", "Access election analytics", "Engage with civic community"].map(f => (
@@ -97,9 +113,8 @@ export default function RegisterPage() {
                 <div className="flex items-center gap-2 mb-6">
                   {[1, 2].map((s) => (
                     <div key={s} className="flex items-center gap-2">
-                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                        s <= step ? "bg-primary text-white" : "bg-muted text-muted-foreground"
-                      }`}>{s}</div>
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${s <= step ? "bg-primary text-white" : "bg-muted text-muted-foreground"
+                        }`}>{s}</div>
                       {s < 2 && <div className={`h-0.5 w-8 transition-colors ${s < step ? "bg-primary" : "bg-muted"}`} />}
                     </div>
                   ))}
@@ -115,7 +130,7 @@ export default function RegisterPage() {
                           <div className="relative">
                             <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input className="pl-10" placeholder="Your full name" value={formData.name}
-                              onChange={e => setFormData({...formData, name: e.target.value})} required />
+                              onChange={e => setFormData({ ...formData, name: e.target.value })} required />
                           </div>
                         </div>
                         <div className="space-y-2">
@@ -123,7 +138,7 @@ export default function RegisterPage() {
                           <div className="relative">
                             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input className="pl-10" type="email" placeholder="you@example.com" value={formData.email}
-                              onChange={e => setFormData({...formData, email: e.target.value})} required />
+                              onChange={e => setFormData({ ...formData, email: e.target.value })} required />
                           </div>
                         </div>
                         <div className="space-y-2">
@@ -131,12 +146,12 @@ export default function RegisterPage() {
                           <div className="relative">
                             <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input className="pl-10" placeholder="+91 XXXXX XXXXX" value={formData.phone}
-                              onChange={e => setFormData({...formData, phone: e.target.value})} required />
+                              onChange={e => setFormData({ ...formData, phone: e.target.value })} required />
                           </div>
                         </div>
                         <div className="space-y-2">
                           <Label>Register As</Label>
-                          <Select value={formData.role} onValueChange={v => setFormData({...formData, role: v})}>
+                          <Select value={formData.role} onValueChange={v => setFormData({ ...formData, role: v })}>
                             <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="citizen">Citizen</SelectItem>
@@ -150,7 +165,7 @@ export default function RegisterPage() {
                           <div className="relative">
                             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input className="pl-10" type="password" placeholder="Create password" value={formData.password}
-                              onChange={e => setFormData({...formData, password: e.target.value})} required minLength={6} />
+                              onChange={e => setFormData({ ...formData, password: e.target.value })} required minLength={6} />
                           </div>
                         </div>
                         <div className="space-y-2">
@@ -158,7 +173,7 @@ export default function RegisterPage() {
                           <div className="relative">
                             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input className="pl-10" type="password" placeholder="Confirm password" value={formData.confirmPassword}
-                              onChange={e => setFormData({...formData, confirmPassword: e.target.value})} required />
+                              onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })} required />
                           </div>
                         </div>
                       </div>
@@ -166,7 +181,7 @@ export default function RegisterPage() {
                   ) : (
                     <div className="space-y-4">
                       <div className="bg-muted/50 rounded-lg p-4 text-sm text-center">
-                        A 6-digit OTP has been sent to<br/>
+                        A 6-digit OTP has been sent to<br />
                         <span className="font-semibold text-foreground">{formData.email}</span>
                       </div>
                       <div className="space-y-2">
@@ -175,7 +190,7 @@ export default function RegisterPage() {
                           type="text"
                           placeholder="Enter 6-digit OTP"
                           value={formData.otp}
-                          onChange={e => setFormData({...formData, otp: e.target.value})}
+                          onChange={e => setFormData({ ...formData, otp: e.target.value })}
                           maxLength={6}
                           className="text-center text-2xl tracking-widest letter-spacing-widest"
                           required
