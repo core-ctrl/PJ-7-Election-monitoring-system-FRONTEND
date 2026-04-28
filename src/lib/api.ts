@@ -1,4 +1,4 @@
-const BASE_URL = "http://localhost:8080/api";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://pj-7-election-monitoring-system-backend-production.up.railway.app/api";
 
 // Auth
 export async function registerUser(name: string, email: string, password: string) {
@@ -106,7 +106,8 @@ export async function likeForumPost(id: number) {
   });
   return res.json();
 }
-// ==================== REPORTS ====================
+
+// Reports
 export async function fetchReports() {
   const res = await fetch(`${BASE_URL}/reports`);
   return res.json();
